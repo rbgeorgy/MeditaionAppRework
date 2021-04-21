@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:meditaion/ComplexVisualElements/DotsIndicator.dart';
+import 'package:meditaion/Notifications/NotificationMethods.dart';
 import 'package:meditaion/Painting/WorkoutUnanimated.dart';
 import 'package:meditaion/Workout/WorkoutAnimated.dart';
 import 'package:meditaion/Workout/WorkoutController.dart';
@@ -20,7 +21,6 @@ class TrainPageView extends StatelessWidget {
               child: Stack(children: [
                 WorkoutUnanimated(sessionData: trainPageViewController.list[0]),
                 WorkoutAnimated(
-                  //параллельно считать анимацию в контроллере и собирать данный виджет, каждый раз исходя из значений в контроллере
                   key: workoutController.keyWorkoutArcAnimatedState,
                   sessionData: trainPageViewController.list[0],
                 ),

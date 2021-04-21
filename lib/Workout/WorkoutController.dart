@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'package:awesome_notifications/awesome_notifications.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:meditaion/Abstractions/SessionData.dart';
+import 'package:meditaion/Notifications/NotificationMethods.dart';
 
 import 'WorkoutAnimated.dart';
 
@@ -11,16 +13,13 @@ class WorkoutController extends GetxController {
   @required
   final SessionData sessionData;
   final GlobalKey<WorkoutAnimatedState> workoutArcAnimatedState;
-  final List<String> textDatas = const [
-    'Вдох',
-    'Выдох',
-    'Задержка'
-  ]; //Есть неточность -- тест на шести элементах в круге. Он ваще ёбнутый?
+  final List<String> textDatas = const ['Вдох', 'Выдох', 'Задержка'];
   var repeatitions = 0.obs;
   var secondsRemains = 0.obs;
   var secondsRemainsThisCircle = 0;
   var secondsRemainsDisplay = ''.obs;
   var secondsRemainsThisCircleDisplay = ''.obs;
+  var breathState = '';
   var _sessionState = 'done'.obs;
   get sessionState => this._sessionState;
   Timer _timer;
@@ -36,8 +35,13 @@ class WorkoutController extends GetxController {
     secondsRemains.value =
         sessionData.numberOfCircles * sessionData.oneCircleDuration;
     secondsRemainsThisCircle = sessionData.oneCircleDuration;
-    secondsRemainsDisplay.value = getTimeViewF(true, false);
-    secondsRemainsThisCircleDisplay.value = getTimeViewF(false, false);
+    secondsRemainsDisplay.value = getTimeViewAndShowNotification(true, false);
+    secondsRemainsThisCircleDisplay.value =
+        getTimeViewAndShowNotification(false, false);
+
+    AwesomeNotifications().actionStream.listen((receivedNotification) {
+      processMediaControls(receivedNotification);
+    });
   }
 
   @override
@@ -53,15 +57,31 @@ class WorkoutController extends GetxController {
               sessionData.durationLimits[sessionData.ids.length - i - 1] &&
           sessionData.oneCircleDuration - secondsRemainsThisCircle - 1 >=
               sessionData.durationLimits[sessionData.ids.length - i]) {
+        breathState = textDatas[sessionData.ids[i].index];
         return textDatas[sessionData.ids[i].index];
       }
     }
-    if (secondsRemainsThisCircleDisplay.value == '00:00')
+    if (secondsRemainsThisCircleDisplay.value == '00:00') {
+      breathState = textDatas[sessionData.ids.last.index];
       return textDatas[sessionData.ids.last.index];
+    }
+    breathState = '';
     return '';
   }
 
-  String getTimeViewF(bool which, bool atEnd) {
+  String getTimeViewAndShowNotification(bool which, bool atEnd) {
+    sessionState != 'done'
+        ? showNotificationWithActionButtons(
+            3,
+            sessionState == 'done'
+                ? 0
+                : sessionState == 'paused'
+                    ? 1
+                    : 2,
+            breathState,
+            secondsRemainsDisplay.value)
+        : cancelNotification(3);
+
     int sr = secondsRemains.value;
     int srtc = secondsRemainsThisCircle;
     if (atEnd) {
@@ -92,8 +112,9 @@ class WorkoutController extends GetxController {
         sessionData.numberOfCircles * sessionData.oneCircleDuration) {
       secondsRemains--;
       secondsRemainsThisCircle--;
-      secondsRemainsDisplay.value = getTimeViewF(true, false);
-      secondsRemainsThisCircleDisplay.value = getTimeViewF(false, false);
+      secondsRemainsDisplay.value = getTimeViewAndShowNotification(true, false);
+      secondsRemainsThisCircleDisplay.value =
+          getTimeViewAndShowNotification(false, false);
       _sessionState.value = 'going';
     }
     if (_timer != null) {
@@ -106,8 +127,10 @@ class WorkoutController extends GetxController {
       } else {
         secondsRemains--;
         secondsRemainsThisCircle--;
-        secondsRemainsDisplay.value = getTimeViewF(true, false);
-        secondsRemainsThisCircleDisplay.value = getTimeViewF(false, false);
+        secondsRemainsDisplay.value =
+            getTimeViewAndShowNotification(true, false);
+        secondsRemainsThisCircleDisplay.value =
+            getTimeViewAndShowNotification(false, false);
         _sessionState.value = 'going';
 
         if (secondsRemainsThisCircle == 0) {
@@ -122,9 +145,10 @@ class WorkoutController extends GetxController {
     if (_timer != null) _timer.cancel();
     secondsRemains.value = repeatitions * sessionData.oneCircleDuration;
     secondsRemainsThisCircle = sessionData.oneCircleDuration;
-    secondsRemainsDisplay.value = getTimeViewF(true, false);
-    secondsRemainsThisCircleDisplay.value = getTimeViewF(false, false);
     _sessionState.value = 'paused';
+    secondsRemainsDisplay.value = getTimeViewAndShowNotification(true, false);
+    secondsRemainsThisCircleDisplay.value =
+        getTimeViewAndShowNotification(false, false);
   }
 
   void pressOnCenterButton() {
@@ -143,8 +167,9 @@ class WorkoutController extends GetxController {
     _timer.cancel();
     _sessionState.value = 'done';
     start.value = false;
-    secondsRemainsDisplay.value = getTimeViewF(true, true);
-    secondsRemainsThisCircleDisplay.value = getTimeViewF(false, true);
+    secondsRemainsDisplay.value = getTimeViewAndShowNotification(true, true);
+    secondsRemainsThisCircleDisplay.value =
+        getTimeViewAndShowNotification(false, true);
     secondsRemains.value =
         sessionData.numberOfCircles * sessionData.oneCircleDuration;
     secondsRemainsThisCircle = sessionData.oneCircleDuration;
@@ -155,5 +180,25 @@ class WorkoutController extends GetxController {
     workoutArcAnimatedState.currentState.addCircle();
     secondsRemains += sessionData.oneCircleDuration;
     repeatitions++;
+  }
+
+  void processMediaControls(actionReceived) {
+    switch (actionReceived.buttonKeyPressed) {
+      case 'STOP':
+        print('stop');
+        stopButton();
+        break;
+      case 'PAUSE':
+        print('pause');
+        pressOnCenterButton();
+        break;
+      case 'ADD_CIRCLE':
+        print('add circle');
+        addCircle();
+        break;
+
+      default:
+        break;
+    }
   }
 }
